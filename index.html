@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Dinge, bei denen Aaron kacke gebaut hat</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    :root {
+      --primary: #ff6363;
+      --bg: #f7f7fb;
+      --card: #ffffff;
+      --text: #222;
+    }
+
+    body {
+      background: var(--bg);
+      font-family: "Segoe UI", Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      min-height: 100vh;
+    }
+
+    .container {
+      background: var(--card);
+      margin: 30px 0;
+      padding: 32px;
+      border-radius: 22px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+      max-width: 600px;
+      width: 95%;
+    }
+
+    h1 {
+      color: var(--primary);
+      text-align: center;
+      font-size: 1.5rem;
+      margin-bottom: 20px;
+    }
+
+    #counter {
+      text-align: center;
+      font-size: 3rem;
+      font-weight: 700;
+      color: var(--primary);
+      margin-bottom: 20px;
+    }
+
+    input {
+      width: 100%;
+      padding: 12px;
+      font-size: 1rem;
+      border-radius: 14px;
+      border: 1px solid #ddd;
+      margin-bottom: 12px;
+    }
+
+    button {
+      background: var(--primary);
+      color: white;
+      font-size: 1rem;
+      font-weight: 600;
+      padding: 12px;
+      border: none;
+      border-radius: 14px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    button:hover {
+      background: #fa2525;
+    }
+
+    .danger {
+      background: #444;
+      margin-top: 10px;
+    }
+
+    .danger:hover {
+      background: #000;
+    }
+
+    .stats {
+      background: #fff3f3;
+      border-radius: 14px;
+      padding: 14px;
+      margin-top: 20px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+      font-size: 0.95rem;
+    }
+
+    th, td {
+      border: 1px solid #eee;
+      padding: 8px;
+    }
+
+    th {
+      background: #fff0f0;
+    }
+
+    .delete-btn {
+      background: none;
+      border: none;
+      color: #ff6363;
+      font-size: 1.2rem;
+      cursor: pointer;
+    }
+
+    canvas {
+      margin-top: 25px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Dinge, bei denen Aaron kacke gebaut hat</h1>
+
+    <div id="counter">0</div>
+
+    <form id="entryForm">
+      <input id="thema" placeholder="Was ist passiert?" maxlength="80" required>
+      <button type="submit">Speichern & Zähler erhöhen</button>
+    </form>
+
+    <button class="danger" id="resetBtn">Alles zurücksetzen</button>
+
+    <div class="stats" id="stats"></div>
+
+    <canvas id="themeChart"></canvas>
+
+    <details>
+      <summary><b>Alle Einträge anzeigen</b></summary>
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Thema</th>
+            <th>Zeitpunkt</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="entriesTable"></tbody>
+      </table>
+    </details>
+  </div>
+
+  <script>
+    let entries = JSON.parse(localStorage.getItem("aaron_entries") || "[]");
+    let chart;
+
+    function save() {
+      localStorage.setItem("aaron_entries", JSON.stringify(entries));
+    }
+
+    function updateView() {
+      document.getElementById("counter").textContent = entries.length;
+
+      // Tabelle
+      const tbody = document.getElementById("entriesTable");
+      tbody.innerHTML = "";
+      entries.slice().reverse().forEach((e, i) => {
+        const index = entries.length - 1 - i;
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${index + 1}</td>
+          <td>${e.thema}</td>
+          <td>${new Date(e.time).toLocaleString("de-DE")}</td>
+          <td><button class="delete-btn" onclick="deleteEntry(${index})">🗑️</button></td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      updateStatsAndChart();
+    }
+
+    function deleteEntry(index) {
+      entries.splice(index, 1);
+      save();
+      updateView();
+    }
+
+    function updateStatsAndChart() {
+      const counts = {};
+      entries.forEach(e => counts[e.thema] = (counts[e.thema] || 0) + 1);
+
+      const labels = Object.keys(counts);
+      const data = Object.values(counts);
+
+      document.getElementById("stats").innerHTML =
+        `Gesamtanzahl: <b>${entries.length}</b>` +
+        (labels[0] ? `<br>Häufigstes Thema: <b>${labels[data.indexOf(Math.max(...data))]}</b>` : "");
+
+      if (chart) chart.destroy();
+
+      chart = new Chart(document.getElementById("themeChart"), {
+        type: "bar",
+        data: {
+          labels,
+          datasets: [{
+            label: "Häufigkeit",
+            data,
+            backgroundColor: "#ff6363"
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { display: false } }
+        }
+      });
+    }
+
+    document.getElementById("entryForm").onsubmit = e => {
+      e.preventDefault();
+      const input = document.getElementById("thema");
+      entries.push({ thema: input.value.trim(), time: Date.now() });
+      input.value = "";
+      save();
+      updateView();
+    };
+
+    document.getElementById("resetBtn").onclick = () => {
+      if (confirm("Wirklich ALLES löschen?")) {
+        entries = [];
+        save();
+        updateView();
+      }
+    };
+
+    updateView();
+  </script>
+</body>
+</html>
