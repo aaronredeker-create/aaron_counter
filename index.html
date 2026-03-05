@@ -5,238 +5,136 @@
   <title>Dinge, bei denen Aaron kacke gebaut hat</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-  <style>
-    :root {
-      --primary: #ff6363;
-      --bg: #f7f7fb;
-      --card: #ffffff;
-      --text: #222;
-    }
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import {
+      getDatabase, ref, push, onValue, remove
+    } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-    body {
-      background: var(--bg);
-      font-family: "Segoe UI", Arial, sans-serif;
-      margin: 0;
-      padding: 0;
-      display: flex;
-      justify-content: center;
-      min-height: 100vh;
-    }
+    const firebaseConfig = {
+  	apiKey: "AIzaSyBKmxkraZdx6MeF_cjB2lsrwycOeeIIujo",
+  	authDomain: "aaron-kacke-counter.firebaseapp.com",
+  	databaseURL: "https://aaron-kacke-counter-default-rtdb.europe-west1.firebasedatabase.app",
+  	projectId: "aaron-kacke-counter",
+  	storageBucket: "aaron-kacke-counter.firebasestorage.app",
+  	messagingSenderId: "600093071909",
+  	appId: "1:600093071909:web:e49042eb9715eac684bdcc"
+    };
 
-    .container {
-      background: var(--card);
-      margin: 30px 0;
-      padding: 32px;
-      border-radius: 22px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.08);
-      max-width: 600px;
-      width: 95%;
-    }
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    const entriesRef = ref(db, "aaron_entries");
 
-    h1 {
-      color: var(--primary);
-      text-align: center;
-      font-size: 1.5rem;
-      margin-bottom: 20px;
-    }
-
-    #counter {
-      text-align: center;
-      font-size: 3rem;
-      font-weight: 700;
-      color: var(--primary);
-      margin-bottom: 20px;
-    }
-
-    input {
-      width: 100%;
-      padding: 12px;
-      font-size: 1rem;
-      border-radius: 14px;
-      border: 1px solid #ddd;
-      margin-bottom: 12px;
-    }
-
-    button {
-      background: var(--primary);
-      color: white;
-      font-size: 1rem;
-      font-weight: 600;
-      padding: 12px;
-      border: none;
-      border-radius: 14px;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-
-    button:hover {
-      background: #fa2525;
-    }
-
-    .danger {
-      background: #444;
-      margin-top: 10px;
-    }
-
-    .danger:hover {
-      background: #000;
-    }
-
-    .stats {
-      background: #fff3f3;
-      border-radius: 14px;
-      padding: 14px;
-      margin-top: 20px;
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 15px;
-      font-size: 0.95rem;
-    }
-
-    th, td {
-      border: 1px solid #eee;
-      padding: 8px;
-    }
-
-    th {
-      background: #fff0f0;
-    }
-
-    .delete-btn {
-      background: none;
-      border: none;
-      color: #ff6363;
-      font-size: 1.2rem;
-      cursor: pointer;
-    }
-
-    canvas {
-      margin-top: 25px;
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <h1>Dinge, bei denen Aaron kacke gebaut hat</h1>
-
-    <div id="counter">0</div>
-
-    <form id="entryForm">
-      <input id="thema" placeholder="Was ist passiert?" maxlength="80" required>
-      <button type="submit">Speichern & Zähler erhöhen</button>
-    </form>
-
-    <button class="danger" id="resetBtn">Alles zurücksetzen</button>
-
-    <div class="stats" id="stats"></div>
-
-    <canvas id="themeChart"></canvas>
-
-    <details>
-      <summary><b>Alle Einträge anzeigen</b></summary>
-      <table>
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Thema</th>
-            <th>Zeitpunkt</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody id="entriesTable"></tbody>
-      </table>
-    </details>
-  </div>
-
-  <script>
-    let entries = JSON.parse(localStorage.getItem("aaron_entries") || "[]");
+    let entries = {};
     let chart;
 
-    function save() {
-      localStorage.setItem("aaron_entries", JSON.stringify(entries));
-    }
+    onValue(entriesRef, snapshot => {
+      entries = snapshot.val() || {};
+      updateView();
+    });
 
-    function updateView() {
-      document.getElementById("counter").textContent = entries.length;
+    window.addEntry = function () {
+      const thema = document.getElementById("thema").value.trim();
+      const by = document.getElementById("by").value.trim();
+      if (!thema || !by) return;
 
-      // Tabelle
-      const tbody = document.getElementById("entriesTable");
-      tbody.innerHTML = "";
-      entries.slice().reverse().forEach((e, i) => {
-        const index = entries.length - 1 - i;
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-          <td>${index + 1}</td>
-          <td>${e.thema}</td>
-          <td>${new Date(e.time).toLocaleString("de-DE")}</td>
-          <td><button class="delete-btn" onclick="deleteEntry(${index})">🗑️</button></td>
-        `;
-        tbody.appendChild(tr);
+      push(entriesRef, {
+        thema,
+        by,
+        time: Date.now()
       });
 
-      updateStatsAndChart();
+      document.getElementById("thema").value = "";
+    };
+
+    window.deleteEntry = function (id) {
+      remove(ref(db, `aaron_entries/${id}`));
+    };
+
+    function updateView() {
+      const list = Object.entries(entries);
+      document.getElementById("counter").textContent = list.length;
+
+      const tbody = document.getElementById("entries");
+      tbody.innerHTML = "";
+
+      const byCount = {}, themeCount = {};
+
+      list.reverse().forEach(([id, e], i) => {
+        byCount[e.by] = (byCount[e.by] || 0) + 1;
+        themeCount[e.thema] = (themeCount[e.thema] || 0) + 1;
+
+        tbody.innerHTML += `
+          <tr>
+            <td>${list.length - i}</td>
+            <td>${e.thema}</td>
+            <td>${e.by}</td>
+            <td>${new Date(e.time).toLocaleString("de-DE")}</td>
+            <td><button onclick="deleteEntry('${id}')">🗑️</button></td>
+          </tr>`;
+      });
+
+      updateChart(themeCount);
+      updateStats(byCount);
     }
 
-    function deleteEntry(index) {
-      entries.splice(index, 1);
-      save();
-      updateView();
-    }
-
-    function updateStatsAndChart() {
-      const counts = {};
-      entries.forEach(e => counts[e.thema] = (counts[e.thema] || 0) + 1);
-
-      const labels = Object.keys(counts);
-      const data = Object.values(counts);
-
+    function updateStats(byCount) {
+      const sorted = Object.entries(byCount).sort((a,b)=>b[1]-a[1]);
       document.getElementById("stats").innerHTML =
-        `Gesamtanzahl: <b>${entries.length}</b>` +
-        (labels[0] ? `<br>Häufigstes Thema: <b>${labels[data.indexOf(Math.max(...data))]}</b>` : "");
+        sorted[0]
+          ? `Aktivster Melder: <b>${sorted[0][0]}</b> (${sorted[0][1]}×)`
+          : "Noch keine Einträge.";
+    }
 
+    function updateChart(themeCount) {
       if (chart) chart.destroy();
-
-      chart = new Chart(document.getElementById("themeChart"), {
+      chart = new Chart(document.getElementById("chart"), {
         type: "bar",
         data: {
-          labels,
+          labels: Object.keys(themeCount),
           datasets: [{
-            label: "Häufigkeit",
-            data,
+            data: Object.values(themeCount),
             backgroundColor: "#ff6363"
           }]
         },
-        options: {
-          responsive: true,
-          plugins: { legend: { display: false } }
-        }
+        options: { plugins: { legend: { display: false } } }
       });
     }
-
-    document.getElementById("entryForm").onsubmit = e => {
-      e.preventDefault();
-      const input = document.getElementById("thema");
-      entries.push({ thema: input.value.trim(), time: Date.now() });
-      input.value = "";
-      save();
-      updateView();
-    };
-
-    document.getElementById("resetBtn").onclick = () => {
-      if (confirm("Wirklich ALLES löschen?")) {
-        entries = [];
-        save();
-        updateView();
-      }
-    };
-
-    updateView();
   </script>
+
+  <style>
+    body { font-family: Arial; background: #f7f7fb; }
+    .box {
+      max-width: 650px; margin: 30px auto; padding: 30px;
+      background: white; border-radius: 20px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.1);
+    }
+    input, button { padding: 10px; margin: 5px 0; width: 100%; }
+    table { width: 100%; border-collapse: collapse; }
+    td, th { border: 1px solid #eee; padding: 6px; }
+  </style>
+</head>
+
+<body>
+  <div class="box">
+    <h1>Dinge, bei denen Aaron kacke gebaut hat</h1>
+    <div id="counter" style="font-size:3em;color:#ff6363">0</div>
+
+    <input id="by" placeholder="Wer trägt es ein?">
+    <input id="thema" placeholder="Was ist passiert?">
+    <button onclick="addEntry()">Eintrag hinzufügen</button>
+
+    <div id="stats"></div>
+    <canvas id="chart"></canvas>
+
+    <table>
+      <thead>
+        <tr><th>#</th><th>Thema</th><th>Von</th><th>Zeit</th><th></th></tr>
+      </thead>
+      <tbody id="entries"></tbody>
+    </table>
+  </div>
 </body>
 </html>
